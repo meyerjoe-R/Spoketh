@@ -1,0 +1,234 @@
+---
+title: "Kickin' Chikn"
+output: 
+  flexdashboard::flex_dashboard:
+      theme: yeti
+      storyboard: true
+social: menu
+source: embed
+---
+    
+    ```{r setup, include=FALSE}
+library(knitr)
+library(flexdashboard)
+library(RColorBrewer)
+library(plotly)
+require(rpivotTable)
+require(openintro)
+require(highcharter)
+require(ggmap)
+require(metricsgraphics)
+require(readxl)
+require(DT)
+require(htmltools)
+library(dygraphs)
+
+ggmap::register_google(key = "AIzaSyCzk5YeyKH7zldNkLTr73C6ct6Ny6fUuys")
+
+
+gdata <- read_xls("/Users/joehome/Desktop/AAMAIO/Data Visualization/us-zip-code-latitude-and-longitude.xls")
+
+
+engdata <- read_xlsx("/Users/joehome/Desktop/AAMAIO/Data Visualization/Engagement and Revenue.xlsx")
+
+data <- read.csv("/Users/joehome/Desktop/AAMAIO/Data Visualization/EmployeeData.csv", row.names = 1)
+
+
+timedata <- read_xlsx("/Users/joehome/Desktop/AAMAIO/Data Visualization/Daily Engagement.xlsx")
+```
+
+
+
+### Regional Data 
+
+```{r}
+#make a map, create a subset
+gdata <- subset(gdata, select = -c(Zip, City, State, 
+                                 Timezone, geopoint))
+#i want the US, maptype is google maps, with color
+map1 <- ggmap(get_googlemap(location = 'united states',
+                                maptype = "hybrid",
+                            zoom = 4,
+                            source = 'google',
+                            color = "color"))
+
+
+# add a layer, x is long, y is lad. colored by revenue.
+
+#add a gradient for revenue
+
+map1 + geom_point(aes(x = Longitude, y= Latitude,
+                  color = Revenue),
+              data = gdata, size = 0.5) +
+                theme(legend.position = "right") +
+                      scale_color_gradient(low = "red", high = "green")
+
+
+```
+
+***
+Takeaways
+
+- The Northeast and Southeast seem to drive revenue this year
+
+- COVID has driven down a large portion of store profit
+
+
+### Employee Data (Store #00929) 
+
+
+```{r}
+
+#create a matrix for plotly
+data <- as.matrix(data)
+
+
+#divide cell values by column mean
+data1 <- apply(data, 2, function(x){x/mean(x)})
+
+#z is data, make a heatmap and specify size parameters
+
+plot_ly(x=colnames(data1),
+        y=rownames(data1),
+        z=data1,
+        width = 700,
+        height = 700,
+        type = "heatmap",
+        colors = "RdYlGn")
+
+```
+
+***
+Takeaways
+
+- There is not much variation in many of the categories
+
+- Complaints and movement seem to be related for some employees
+
+- There may be a couple of bad apples 
+
+### Daily Engagement 
+
+```{r}
+
+#html widget dygraph, specify labels and sizing, add a range selector
+
+d <- dygraph(timedata,
+        main = "Engagement",
+        ylab = "Day",
+        width = 600,
+        height = 270)
+    dyRangeSelector(d)
+```
+
+***
+Takeaways
+
+- Engagement has dropped off substantially
+
+
+### Top Employees
+
+```{r}
+datatable(data, options = list(pageLength = 10))
+```
+
+
+
+### Regional Performance
+
+```{r}
+
+#examine reported regional performance
+
+x <- c('Northeast', 'Northwest', 'South', 'Midwest')
+y <- c(90, 62, 85, 75)
+
+
+#frame
+regdata <- data.frame(x,y)
+
+#ggplot, fill based on x variable
+
+#geom bar for barplot
+
+regchart <- ggplot(data = regdata, aes(x= x, y=y,
+            fill=x)) +
+            ggtitle("Regional Performance") +
+            geom_bar(stat="identity") +
+            xlab("Region") + ylab("Job Performance") + 
+            theme(legend.position = 'none')
+
+regchart
+                
+
+
+```
+
+
+***
+Takeaways
+
+- The Northeast has the highest job performance, the Northwest seems to be lagging behind
+
+### Regional Engagement
+
+```{r}
+
+#look at regional engagement
+
+
+x2 <- c('Northeast', 'Northwest', 'South', 'Midwest')
+y2 <- c(75, 21, 74, 70)
+
+regeng <- data.frame(x2,y2)
+
+#samesies
+
+regengdat <- ggplot(data = regeng, aes(x= x2, y=y2,
+            fill=x2)) +
+            ggtitle("Regional Engagement") +
+            geom_bar(stat="identity") +
+            xlab("Region") + ylab("Engagement") +
+            theme(legend.position = 'none')
+
+
+regengdat
+    
+```
+
+
+***
+Takeaways
+
+- Regional Engagement sees similar trends
+
+- Engagement is very low in the Northwest
+
+
+### Engagement and Revenue
+
+
+
+```{r}
+
+
+#interactive html widget
+
+#height, color and size it based on revenue
+mjs_plot(engdata, x=Engagement, y=Revenue, width = 600, height = 500) %>%
+    mjs_point(color_accessor=Revenue, size_accessor=Revenue) %>%
+    mjs_labs(x="Engagement", y="Daily Revenue")
+
+
+
+```
+
+
+***
+Takeaways
+
+- Based on a recent survey, engagement seems to be highly related to daily revenue
+
+
+
