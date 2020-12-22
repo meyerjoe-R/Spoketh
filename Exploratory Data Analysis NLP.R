@@ -185,11 +185,6 @@ popular_words3 %>%
   coord_flip()
 
 
-#now lets use TF-IDF, which means term frequency inverse document frequency
-
-#lower weights are assigned for ocmmonly used words, and higher for the opposite
-
-
 
 
 
