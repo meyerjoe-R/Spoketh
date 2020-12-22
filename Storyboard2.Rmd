@@ -1,0 +1,123 @@
+---
+title: "Kickin' Chikn Overall Metrics"
+output: 
+  flexdashboard::flex_dashboard:
+      theme: yeti
+      orientation: column
+      vertical_layout: fill
+social: menu
+source: embed
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+require(readxl)
+require(rpivotTable)
+require(knitr)
+
+
+gdata <- read_xls("/Users/joehome/Desktop/AAMAIO/Data Visualization/us-zip-code-latitude-and-longitude.xls")
+
+
+
+engdata <- read_xlsx("/Users/joehome/Desktop/AAMAIO/Data Visualization/Engagement and Revenue.xlsx")
+
+data <- read.csv("/Users/joehome/Desktop/AAMAIO/Data Visualization/EmployeeData.csv", row.names = 1)
+
+
+timedata <- read_xlsx("/Users/joehome/Desktop/AAMAIO/Data Visualization/Daily Engagement.xlsx")
+
+```
+
+
+Row {data-width=350}
+-------------------------
+
+### Overall Metrics
+
+```{r}
+#value 
+valueBox(sum(data$Accidents),
+         icon = "fa-user",
+         color = 'red',
+         caption = "Accidents")
+```
+
+### Complaints
+
+```{r}
+valueBox(sum(data$Complaints), 
+         caption = "Total Complaints",
+         icon = "fa-thumbs-down",
+         color = 'red')
+```         
+
+
+
+### Daily Engagement
+```{r}
+#value 
+valueBox(round(mean(timedata$`Daily Engagement`), digits = 2),
+         icon = "fa-thumbs-up",
+         "Engagement Average")
+
+```
+
+### Revenue
+
+```{r}
+valueBox(sum(gdata$Revenue*1000),
+        icon = "fa.Building",
+        color = 'green',
+        caption = "Total Revenue")
+#value 
+```
+
+
+
+### Stores
+```{r}
+#value 
+valueBox(length(gdata$Revenue),
+         icon = "fa.building",
+         "Total Stores")
+```
+
+
+### Performance
+```{r}
+#value 
+valueBox(mean(data$Performance),
+         icon = "fa-thumbs-up",
+         color = 'green',
+        "Average Performance")
+```
+
+
+### Absences
+```{r}
+valueBox(mean(data$Absences),
+         icon = "fa-thumbs-down",
+         color = 'red',
+         "Average Absences",
+         href = "file:///Users/joehome/Desktop/AAMAIO/Storyboard.html")
+#value 
+
+```
+
+
+Row {data-width=650}
+-------------------------
+
+### Data Table
+
+```{r}
+rpivotTable(gdata, aggregatorName = "Sum", rows = "State", cols= "Revenue", width = 700)
+#pivot
+```
+
+
+
+
+
+
