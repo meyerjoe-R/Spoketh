@@ -59,12 +59,12 @@ dtm2
 
 
 #remove words that are less frequent to focus on important words
-#in this case, words must show up in at least 10% of the documents
+#in this case, words must show up in at least 2% of the documents
 sparse2 <- removeSparseTerms(dtm2, .98)
 sparse2
 
 
-#we now have 464 features
+
 #now convert matrix into a data frame for training
 important_words_df2 <- as.data.frame(as.matrix(sparse2))
 
@@ -85,11 +85,12 @@ test2 <- cbind(test2, important_words_test_df2)
 
 #analysis time
 
-#let's use naive bayes - bayesian probability that A has occured given B
+#let's use a naive bayes classification algorithm that has been shown historically to perform well in similar situations
+#examines bayesian probability that A has occured given B
 
 #most basic picture, posterior = prior x likelihood/evidence
 
-#Naive bayes assumes that features are equally important and independent, ehh might not happen
+#Naive bayes assumes that features are equally important and independent, how naive of it!!
 
 
 train2 <- train2 %>%
@@ -112,7 +113,7 @@ test2$Meaning_SR_Very <- as.factor(test2$Meaning_SR_Very)
 y<- train2$Meaning_SR_Very
 
 
-#set train control, repeated k folds cross val
+#set train control, repeated k folds cross validation
 
 train_control <- trainControl(
   method = "repeatedcv", 
@@ -135,15 +136,15 @@ confusionMatrix(nb.m1)
 
 #below is from https://uc-r.github.io/naive_bayes
 
-#examine tuning grid
-#use kernel is a non-parametric way to estimate probability densities, from my understanding
+#examine tuning grid for various hyperparameters
+#use kernel is a non-parametric way to estimate probability densities, from my understanding, we will examine if this improves the model
 #adjust allows the density estimate to be more flexible
 #fl examines laplace smoother
 
 
-#from my understanding, when an individual class label is not there,
+#from my reading, when an individual class label is not there,
 #a probability estimate will be zero
-#Laplace smoothing adds counts to our data to prevent occurrences of zero
+#Laplace smoothing adds counts to our data to prevent occurrences of zero, thus preventing the zero issue
 
 search_grid <- expand.grid(
   usekernel = c(TRUE, FALSE),
@@ -152,11 +153,9 @@ search_grid <- expand.grid(
 )
 
 
-#try a second model using our search grid from above
+#try an optimal second model using our search grid from above
 #this model also contains several pre processing approaches
 
-#box cox normalizes data
-#scale standardizes and PCA reduces variables
 
 
 nb.m2 <- train(
@@ -174,7 +173,7 @@ nb.m2$results %>%
   arrange(desc(Accuracy))
 
 
-#predict test set
+#predict test set, killer performance!
 pred <- predict(nb.m2, newdata = test2)
 confusionMatrix(pred, test2$Meaning_SR_Very)
 
