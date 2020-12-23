@@ -23,19 +23,10 @@ require(plyr)
 require(qdapRegex)
 require(textclean)
 
-#what is NLP? Natural language processing (NLP) is 
-       # defined as the use of computers to process natural language (Matthews, 2016)
-#what is sentiment analysis?
+#Let's tinker with some introductory NLP
+#what is NLP? Natural language processing (NLP) is defined as the use of computers to process natural language (Matthews, 2016)
+#I will also examine some basic sentiment analysis and machine learning
 #what is machine learning? ML
-
-
-
-# Data requirements for this type of analysis
-# Practical utility of this type of analysis
-
-
-
-
 
 
 
@@ -90,7 +81,7 @@ smp_size <- floor(0.75 * nrow(data))
 
 #creates an integer length of 75% of data
 #sample takes a sample, seq len creates a sequence of numbers 
-#that ends at our smple size
+#that ends at our sample size
 
 train_ind <- sample(seq_len(nrow(data)),
                     size = smp_size)
@@ -104,7 +95,7 @@ test <- data[-train_ind, ]
 
 
 
-#create a corpus, which is basically a bunch of text
+#create a corpus, which is basically a collection of text and a major building block in this frameworrk
 #this creates a collection of objects
 #our content is the sentences
 #vector source interprets each part of the vector as a document
@@ -164,7 +155,7 @@ important_words_df <- as.data.frame(as.matrix(sparse))
 #view our bag of words
 View(important_words_df)
 
-#make names out of 
+#make names
 colnames(important_words_df) <- make.names(colnames(important_words_df))
 
 View(important_words_df)
@@ -180,7 +171,7 @@ important_words_test_df <- tail(important_words_df, nrow(test))
 
 
 
-# Add to original dataframes
+# Add to original dataframes using cbind
 train <- cbind(train, important_words_train_df)
 test <- cbind(test, important_words_test_df)
 
@@ -192,7 +183,7 @@ test$Text <- NULL
 
 
 
-#bag of words time, let's build a classifier
+#bag of words time, let's build a classifier using logistic regression --> does the patterning belong to class 0 or 1?
 
 
 #documents are treated as frequencies of words
@@ -200,7 +191,7 @@ test$Text <- NULL
 
 #so, sentiment classification will be based on what words are in the documents
 
-#words are the features to help us train
+#ie words are the features to help us train
 
 
 #clean up unwanted data, retain features
@@ -262,7 +253,7 @@ full_model <- glm(sentiment ~., data = train, family = "binomial")
 
 
 
-#step wise model
+#step wise model, don't run!!
 step_model <- step(null_model, scope = list
                    (lower = null_model, upper = full_model),
                    direction = "forward")
@@ -270,7 +261,7 @@ step_model <- step(null_model, scope = list
 
 
 
-
+#now I will evaluate a different situation --> employee open ended responses
 
 data2 <- read.csv("/Users/joehome/Desktop/R Code/Natural Language Processing:Bag of Words/Data/work-stories-corpus-clean.csv")
 
