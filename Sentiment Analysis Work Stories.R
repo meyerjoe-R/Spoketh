@@ -93,12 +93,6 @@ words %>%
   coord_flip()
 
 
-#Let's expand our unit of analysis and examine sentiment at the response level, this time I'll examine a different response
-
-data3 <- data %>%
-  select(Overall_Why,)
-
-
 
 
 
