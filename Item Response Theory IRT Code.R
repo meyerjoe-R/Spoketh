@@ -8,6 +8,8 @@ require(ltm)
 data <- read.csv("/Users/joehome/Desktop/AAMAIO/IRT 2PL Data.csv")
 
 
+#Basic 2PL model for quick coding
+
 #ltm create a 2PL model
 latent <- ltm(data ~ z1)
 
@@ -16,9 +18,7 @@ latent <- ltm(data ~ z1)
 latent
 
 
-
 #plot the output
-
 
 plot(latent, items = 1:3)
 
