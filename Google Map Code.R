@@ -21,7 +21,7 @@ data <- na.omit(data)
 
 
 data <- subset(data, select = -c(Zip, City, State, 
-                                 Timezone, geopoint))  #remove unecessary rows
+                                 Timezone, geopoint))  #remove unecessary columns
 
 
 #get the map, location is the US
