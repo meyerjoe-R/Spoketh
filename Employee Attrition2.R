@@ -188,7 +188,7 @@ RF1
 
 
 
-#now let's talk about, then examine hyperparameters and other levers
+#now let's talk about, then examine hyperparameters and other "levers"
 
 #the following is from https://bradleyboehmke.github.io/HOML/random-forest.html, which is a great ML source
 
@@ -196,7 +196,7 @@ RF1
 #Consideration 1 --> The number of trees in the forest
 #rule of thumb it to start with 10 x number of features
 
-#The number of features to consider at any given split
+#2 ---> The number of features to consider at any given split
 #this is called mtry, which controls how splitting occurs
 #defaults will depend on whether you are doing regression or classification
 #also, it depends on how noisy your data is (irrelevant variables)
