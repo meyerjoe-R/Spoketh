@@ -11,9 +11,9 @@ require(ggpubr)
 
 
 #create keys and authenticate, this will produce a pop up
-api_key <- "Kzr3ubKfFUJKiDoTGWvdusjvR"
+api_key <- "key here"
 
-api_secret_key <- "ovNyzUyEfC77QurL2TEXZJTmGguIbncBLqhOhulX5gUswZvN8h"
+api_secret_key <- "secret key here"
 
 token <- create_token(
   app = "bottomofthebarrel",
