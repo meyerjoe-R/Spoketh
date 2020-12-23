@@ -25,27 +25,17 @@ require(pvclust)  #bootstrap
 data1 <- read_xlsx("/Users/joehome/Desktop/AAMAIO/Cluster Analysis and Latent Profile Analysis/country_clusters.xlsx")
 
 
-
-
 str(data1) #view structure
 
-
-
 data1 <- na.omit(data1) #remove NAs
-
-
 
 
 matrix1 <- cor(data1) #corr
 
 
 
-
-
 corrplot(matrix1, type = "upper", order = "hclust",
          col=brewer.pal(n=8, name = "RdYlBu")) #corr
-
-
 
 
 ggplot(data1, aes(x = data1$Revenue, y = data1$Stock)) +
@@ -54,10 +44,7 @@ ggplot(data1, aes(x = data1$Revenue, y = data1$Stock)) +
   theme_bw()
 
 
-
-
 data1 <- scale(data1) #standardize the data to level out units
-
 
 
 head(data1)  #check it out
@@ -65,10 +52,7 @@ head(data1)  #check it out
 
 
 
-
 #example graph
-
-
 
 
 kmean_withinss <- function(k) {
@@ -81,7 +65,6 @@ kmean_withinss <- function(k) {
 #run the function k times
 
 #store the total within clusters sum of squares
-
 
 
 max_k <- 3  #maximum number is 20
@@ -98,38 +81,27 @@ wss <- sapply(2:max_k, kmean_withinss)
 elbow <- data.frame(2:max_k, wss)
 
 
-
 ggplot(elbow, aes(x=X2.max_k, y = wss)) +
   geom_point()+
   geom_line()+
   scale_x_continuous(breaks = seq(1,20, by = 1))
 
-
-
 cluster1 <-kmeans(data1, nstart = 25, 2) #clusta
-
-
 
 
 
 str(cluster1)  #check it out
 
 
-
-
 clusplot(data1, cluster1$cluster, color = TRUE, shade = TRUE, lines = 0)
-
 
 
 d <-dist(data1, method = "euclidian") #distance matrix
 
-
 fit <- hclust(d, method = "ward.D")  #hierarchical cluster, with wards
 
 
-
 plot(fit) #model
-
 
 
 group <-cuttree(fit, k=2)  #examine dendogram
@@ -163,11 +135,12 @@ pvrect(fit1, alpha=.95)  #examine groups highly supported
 
 library(tidyverse)  
 
-#grab some data broskis
+#grab some data yall
 
 
 install.packages("tidyLPA")
 
+#Now, I will utilize latent profile analysis quickly, which can identify latent subpopulations within a dataset
 
 
 require(tidyLPA)
@@ -189,7 +162,6 @@ d1
 d2 <- pisaUSA15[1:100, ] %>%
   single_imputation() %>%
   estimate_profiles(3)
-
 
 
 
