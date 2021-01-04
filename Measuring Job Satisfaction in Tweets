@@ -1,0 +1,649 @@
+
+install.packages("spacyr")
+devtools::install_github("kbenoit/quanteda.dictionaries")
+devtools::install_github("quanteda/quanteda.corpora")
+install.packages("sentimentr")
+install.packages("qdapRegex")
+install.packages("quanteda.textmodels")
+install.packages("janitor")
+install.packages("topicmodels")
+install.packages("ldatuning")
+install.packages("LDAvis")
+install.packages("tsne")
+install.packages("pdp")
+
+
+require(lexicon)
+require(pdp)
+require(tsne)
+require(LDAvis)
+require(tm)
+require(ldatuning)
+require(janitor)
+require(topicmodels)
+require(quanteda.textmodels)
+require(rsample)
+require(e1071)
+require(dplyr)
+require(klaR)
+require(rtweet)
+require(ggplot2)
+require(qdapRegex)
+require(dplyr)
+require(sentimentr)
+require(tidyverse)
+require(kernlab)
+require(readxl)
+require(quanteda)
+require(caret)
+require(rsample)
+
+
+
+
+
+#Job satisfaction has been defined as a pleasurable emotional state resulting from the appraisal of one's job experiences
+#Many theories approach JS from 
+#cognitive, affective, and/or behavioral perspectives (Locke, 1976; Hulin & Judge, 2003)
+#being that cognition and affect may have influence language expression → signals of job satisfaction may be found in language, especially affectively-laden things like sentiment
+
+#Work is very central to our lives (Judge & Klinger, 2020), thus we may find information about job satisfaction on social media
+
+#twitter may contain more authentic feelings compared to an employee survey and serve as a good source for data
+
+
+
+
+#This is an exploratory analysis to discover potential signals of JS in tweets. In the first set of code, I scrape two sets of twitter data to analyze tweets related to coworkers, work, and supervisors. The search did not return tweets regarding boss/supervisors.
+#I build off of computer science literature and use distant supervision, which is a form of weak supervised learning, to annotate tweets as positive or negative
+#Then I use unigrams, bigrams, sentiment, and a positive/negative word dictionary as predictors (features) to classify sentiment
+#Average sentiment of tweets, followed by positive/negative dictionary counts, have the strongest variable importance across the models
+
+#Finally I do an exploratory analysis and look at topics ("themes") in the unstructured data using LDA
+
+
+#Future work may benefit from figuring out how to weed out non job relevant tweets prior to classification and use entity recognition to identify sentiment directed at a boss, for example. A larger sample size would also be helpful. Collecting demographic data and examining bias is important as well.
+
+
+
+
+
+##############################################
+################################
+###
+##
+
+#create keys and authenticate, this will produce a pop up
+api_key <- "key"
+
+api_secret_key <- "key"
+
+token <- create_token(
+  app = "bottomofthebarrel",
+  consumer_key = api_key,
+  consumer_secret = api_secret_key)
+
+
+#search for tweets
+#keywords should evoke tweets regarding job, supervisor, and coworkers
+tweets1 <- search_tweets2(
+  c("coworker :) OR coworkers :)", "my job :) OR my work :)", "my supervisor :) OR my boss :)",
+    "coworker :( OR coworkers :(", "my job :( OR my work :(", "my supervisor :( OR my boss :("),
+  n = 50000, include_rts = FALSE, lang= "en", 
+  retryonratelimit = TRUE)
+
+
+stream_tweets2("coworker :), my job :), my work :), my supervisor :), my boss,
+  coworker :(, my job :(, my work :(, my supervisor :(,  my boss :(",
+  timeout = 60 * 60 * 24 * .5,
+  file_name = "jobsattweets.json",
+  parse = FALSE)
+
+## read in the data as a tidy tbl data frame
+
+tweets2 <- parse_stream("/Users/joehome/Desktop/stream-20201230235022/jobsattweets-1.json")
+
+
+#initial inspection for weak face validity --> are they related to work?
+
+#select wanted variables, filter out retweets
+tweets1 <- tweets1 %>%
+  filter(is_retweet=="FALSE") %>%
+  dplyr::select(text,created_at,country)
+
+
+#use excel to automatically annotate positive/negative sentiment
+#I use excel due to the difficulty of dealing with parentheses in r
+
+#write to excel to code tweets containing :) as positive and the opposite as negative
+write.csv(tweets1, "Tweets.csv")
+
+#first I collapsed all forms of the most common emojis (e.g., :),:D, :-) ) to :)
+
+#then, 
+#in excel: =IF(ISNUMBER(SEARCH(":)",cell)),"1","0")
+#this coded all instances of positive emojis as 1, and absence as zero
+
+#I inspected the automatic coding. There seemed to be issues with sarcasm, especially with positive emojis, so I attempted to recode sentiment because the sample size is fairly small
+
+#this is a rudimentary approach to distant supervision, which has had some success
+#see Go, Bhayani, & Huang
+
+###################################
+###############################
+##########################
+
+
+#bring it back up
+annotated <- read.csv("/Users/joehome/Desktop/R Code/Annotated Tweets 12.31.csv")
+
+annotated <- annotated %>%
+  dplyr::select(-c(X, created_at))
+
+#remove emojis first as I see they pop up some
+annotated$text <- gsub("[^\x01-\x7F]", "", annotated$text)
+
+
+#create a corpus
+corpus <- corpus(annotated$text)
+summary(corpus)
+texts(corpus) [2]
+
+#create document level variable of sentiment code
+docvars(corpus, "Sentiment") <- annotated$Sentimentcode
+summary(corpus)
+
+
+#split corpus by positive/negative satisfaction as per annotations for initial inspection
+splitcorpus <- corpus_subset(corpus, Sentiment %in% c("1", "0"))
+
+
+#create dfm grouped by sentiment
+splitdfm <- dfm(splitcorpus, groups = "Sentiment", remove = stopwords("english"),
+                remove_punct = TRUE, stem = TRUE, tolower = TRUE)
+
+
+
+#calculate keyness, which examines how there are differential associations of words across satisfied and unsatisfied tweeters; there are clear differences in the connotations of words across groups
+result_key <- textstat_keyness(splitdfm, target = "1")
+textplot_keyness(result_key, n=10L, show_reference = TRUE, show_legend = TRUE)
+
+write.csv(result_key, "Keyness.csv")
+
+keyness <- read.csv("/Users/joehome/Desktop/Keyness.csv")
+
+
+keyness$Satisfaction <- ifelse(keyness$chi2 > 0, "Satisfied", "Unsatisfied")
+
+keyness <- keyness %>%
+  group_by(Satisfaction) %>%
+  arrange(.by_group = TRUE, desc(chi2))
+
+#factor
+keyness$Satisfaction <- as_factor(keyness$Satisfaction[order(keyness$chi2, decreasing = TRUE)])
+
+ggplot(keyness, aes(x=reorder(feature, +chi2), y=chi2)) +
+  geom_col(mapping = aes_string(fill="Satisfaction")) +
+  theme_light() +
+  scale_fill_manual(values = c("Blue", "Red")) + 
+  theme(plot.title = element_text(hjust = 0.5), legend.position = "right", panel.background =element_rect(fill="white"),
+              panel.grid.major=element_line(color="white"),
+              panel.grid.minor=element_line(color="white")) +
+  labs(y="Chi Squared (C2)", x= "Words", title = "Word Usage Across Groups", caption = "Note: C2 examines difference in frequencies across groups") +
+  coord_flip()
+
+
+
+
+##### on to general dfm
+
+#briefly examine key words in the wild using kwic
+
+kwic(corpus, pattern = "job")
+
+
+token <-
+  tokens(
+    corpus,
+    remove_numbers = TRUE,
+    remove_punct = TRUE,
+    remove_symbols = TRUE,
+    remove_twitter = TRUE,
+    remove_url = TRUE,
+    split_hyphens = TRUE,
+    include_docvars = TRUE
+  )
+
+token <- tokens_remove(token, stopwords("english"))
+
+dfm1 <- dfm(token, tolower = TRUE, stem = TRUE)
+
+
+#trim dfm
+dfm1<- dfm_trim(
+  dfm1,
+  min_termfreq = .001,
+  termfreq_type = c("prop"))
+
+
+#term frequency inverse document frequency weighting
+dfm1 <- dfm_tfidf(dfm1, force = TRUE)
+
+#create first model, only unigrams
+mod <- as.data.frame(dfm1)
+
+mod$Sentimentcode <- annotated$Sentimentcode
+mod$Sentimentcode <- as.factor(mod$Sentimentcode)
+
+set.seed(1)
+trainIndex0 <- createDataPartition(annotated$Sentimentcode, p = .8, 
+                                  list = FALSE, 
+                                  times = 1)
+Train <- mod[ trainIndex0,]
+Test  <- mod[-trainIndex0,]
+
+Train <- Train %>%
+  dplyr::select(can:Sentimentcode)
+
+
+Test <- Test %>%
+  dplyr::select(can:Sentimentcode)
+
+
+#set train control, repeated k folds cross val for logistic regression
+
+train_control <- trainControl(
+  method = "repeatedcv", 
+  number = 10,
+  repeats = 3
+)
+
+mod1 <- train(Sentimentcode ~., data = Train, trcontrol = train_control, family = "binomial")
+
+
+mod1$results
+mod1$bestTune
+
+
+log_pred0 <- predict(mod1, newdata = Test, type = "raw")
+
+confusionMatrix(data = log_pred0,
+                reference = Test$Sentimentcode)
+
+
+varImp(mod1)
+
+#bring in positive/negative words dictionary
+
+dict <- data_dictionary_LSD2015
+
+#use dictionary to examine our matrix, retain words not found
+dfm2 <- dfm_lookup(dfm1, dict, exclusive =  FALSE, capkeys = TRUE)
+
+
+#create matrix out of dtm
+dfm2 <- as.data.frame(as.matrix(dfm2))
+
+#bind annotated data, dictionary counts, and dfm to begin forming features
+annotated <- cbind(annotated, dfm2)
+
+
+#analyze sentiment via sentiment r to add to relevant features
+#sentiment may be a relevant signal to predicting positive perceptions of job/coworkers/etc.
+#sentiment r takes into account various complexities to analyzing text
+#especially negation (e.g., “not good” not being perceived as positive), which is not represented in a traditional bag of words approaches
+
+#get sentences
+senti <- get_sentences(annotated$text)
+senti <- sentiment(senti)
+
+#average sentiment by tweeter
+para <- senti %>%
+  group_by(element_id) %>%
+  summarize(averagesent = mean(sentiment))
+
+
+#bind sentiments of sentences into dataframe
+annotated <- cbind(para, annotated)
+
+is.na(annotated)
+
+annotated$Sentimentcode <- as.factor(annotated$Sentimentcode)
+
+
+#Examine sentiment across queries --> coworkers vs. work satisfaction #don't run
+gg <- annotated %>%
+  group_by(query) %>%
+  summarise(AverageSentiment = mean(averagesent)) 
+
+ggplot(gg, aes(x=query, y=AverageSentiment, fill = query)) +
+  geom_bar(stat = "identity") +
+  geom_hline(yintercept=0, linetype = "dashed", color = "red", size =1.5) +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+
+
+gg2 <- annotated %>%
+  group_by(Sentimentcode) %>%
+  summarise(Average_Sentiment = mean(averagesent))
+
+ggplot(gg2, aes(x=Sentimentcode, y=Average_Sentiment)) +
+         geom_bar(stat = "Identity", fill = "Steel Blue") +
+         theme_minimal()
+         
+
+#split into train and test
+
+
+set.seed(1)
+trainIndex <- createDataPartition(annotated$Sentimentcode, p = .8, 
+                                  list = FALSE, 
+                                  times = 1)
+
+
+Train1 <- annotated[ trainIndex,]
+Test1  <- annotated[-trainIndex,]
+
+
+#ML
+
+Train2 <- Train1 %>%
+  dplyr::select(averagesent, Sentimentcode, can:send)
+
+
+Test2 <- Test1 %>%
+  dplyr::select(averagesent, Sentimentcode, can:send)
+
+#set train control, repeated k folds cross val
+
+train_control <- trainControl(
+  method = "repeatedcv", 
+  number = 10,
+  repeats = 3
+)
+
+#support vector machine attempts to identify "support vectors" that are data close to what's called a hyperplane
+#this hyperplane best divides the data set into two classes, which in our case is satisfied and not satisfied
+#this is occurring in multidimensional space
+
+#Lujing Chen likens this to separating pedestrians and cares, creating the widest lane possible
+#while the closest cars and people to the hyperplane are the support vectors
+
+set.seed(2)
+model <- train(Sentimentcode ~ ., data= Train2, method = "svmLinear",
+               trControl = train_control)
+
+model$finalModel
+model$results
+
+predicted.classes <- model %>% predict(Test2)
+
+mean(predicted.classes == Test2$Sentimentcode)
+
+confusionMatrix(model)
+
+#examine the cost hyperparameter, which creates a penalty for misclassification
+
+       
+model <- train(Sentimentcode ~., data = Train2, method = "svmLinear",
+               trControl = train_control, tuneGrid = expand.grid(
+                 C=seq(0,2, length = 20)))
+
+#Examine hyperparameter's effects on cross-validated accuracy
+plot(model)
+
+      
+confusionMatrix(model)
+
+
+#examine best tune, 1 was the original default
+model$bestTune
+model$results
+
+
+predicted.classes <- model %>% predict(Test2)
+mean(predicted.classes == Test2$Sentimentcode)
+
+
+#examine most important variables
+#We see that average sentiment for each tweet as well as the NEGATIVE and POSITIVE variable created from dictionary counts
+roc_imp2 <- varImp(model, scale = FALSE)
+roc_imp2
+
+#plot importance
+plot(roc_imp2, top=10)
+
+
+
+#examine average sentiment, negative, and positive word counts as predictors using logistic regression, exploratory
+
+Train3 <- Train2 %>%
+  dplyr::select(averagesent, NEGATIVE, POSITIVE, Sentimentcode)
+
+#different train control
+train_control2 <- trainControl(
+  method = "cv", 
+  number = 10,
+)
+
+model1 <- train(Sentimentcode ~., data = Train3, trcontrol = train_control2, family = "binomial")
+
+
+model1$results
+model1$bestTune
+
+
+log_pred <- predict(model1, newdata = Test2, type = "raw")
+
+confusionMatrix(data = log_pred,
+                reference = Test2$Sentimentcode)
+
+#We see that average sentiment plays a strong role again, this makes sense from the perspective of seeing job sat as affectively laden
+varImp(model1)
+
+
+
+
+#Examine bigrams for more explainability/sensemaking
+bigram <- tokens_ngrams(token, n=2L)
+
+bi <- dfm(bigram, tolower = TRUE, stem = TRUE)
+
+#trim bigram matrix
+
+bi <- dfm_trim(
+  bi,
+  min_termfreq = .001,
+  termfreq_type = c("prop"))
+
+#tfidf weight
+bi <- dfm_tfidf(bi, force = TRUE)
+
+
+biframe <- convert(bi, to = "data.frame")
+#add average sent etc.
+biframe$averagesent <- para$averagesent
+biframe$Sentimentcode <- annotated$Sentimentcode
+biframe$POSITIVE <- annotated$POSITIVE
+biframe$NEGATIVE <- annotated$NEGATIVE
+biframe <- biframe %>%
+  dplyr::select(-doc_id)
+
+
+#create an index
+trainIndex3 <- createDataPartition(biframe$Sentimentcode, p = .8, 
+                                  list = FALSE, 
+                                  times = 1)
+
+Train4 <- biframe[ trainIndex3,]
+Test4 <- biframe[-trainIndex3,]
+
+Train4 <- Train4 %>%
+  dplyr::select(cowork_said:NEGATIVE)
+
+Test4 <- Test4 %>%
+  dplyr::select(cowork_said:NEGATIVE)
+
+model2 <- train(Sentimentcode ~., data = Train4, trcontrol = train_control, family = "binomial")
+
+model2$results
+
+log_pred2 <- predict(model2, newdata = Test4, type = "raw")
+
+#We see decent accuracy, specificity, and Kappa
+confusionMatrix(data = log_pred2,
+                reference = Test4$Sentimentcode)
+
+
+p1 <- model2 %>% 
+  partial(pred.var = "averagesent") %>% 
+  autoplot(smooth = TRUE) +
+  theme_light() +
+  ggtitle("Sentiment and Satisfaction")
+
+p1
+  
+
+  
+topPredictors(model2)
+
+varImp(model2)
+
+
+
+vip(model2, 
+    num_features = 3L,
+    geom = "col",
+    mapping = aes_string(fill = "Variable"),
+    aesthetics = list(color = "Black", size = 0.8)) +
+    labs(y="Variable Importance", x= "Variables", title = "Top Predictors",
+         caption = "Note: Scaled importance. Positive/Negative = Dictionary Counts.") +
+  theme_light() +
+  theme(plot.title = element_text(hjust = 0.5), legend.position = "none", panel.background =element_rect(fill="white"),
+panel.grid.major=element_line(color="white"),
+panel.grid.minor=element_line(color="white"))
+
+
+
+
+###################################################
+#now onto the larger dataset, attempt to find hidden topics
+
+tweets4 <- read.csv("/Users/joehome/Desktop/R Code/Tweets Stream 12.31.csv")
+
+#use when analyzing small frame
+tweets4 <- read.csv("/Users/joehome/Desktop/R Code/Annotated Tweets 12.31.csv")
+
+#remove emojis
+tweets4$text <- gsub("[^\x01-\x7F]", "", tweets4$text)
+
+tweets4 <- tweets4 %>%
+  dplyr::select(text)
+
+tweets4 <- remove_empty(tweets4, which= "rows")
+
+
+#create a corpus
+#use tm due to easy interface with topic models
+docs <- Corpus(VectorSource(tweets4$text))
+docs <-tm_map(docs,content_transformer(tolower))
+docs <- tm_map(docs, removePunctuation)
+docs <- tm_map(docs, removeNumbers)
+docs <- tm_map(docs, removeWords, stopwords(language = "en"))
+docs <- tm_map(docs, stripWhitespace)
+docs <- tm_map(docs,stemDocument, language = "english")
+
+
+dtm <- DocumentTermMatrix(docs)
+dtm <- removeSparseTerms(dtm, .95)
+
+
+inspect(dtm)
+freq <- colSums(as.matrix(dtm))
+length(freq)
+
+
+
+##LDA for exploratory purposes
+#LDA aims to identify hidden topics in text
+#LDA uses what's called Gibbs sampling, which operates by doing a "random walk"
+This is basically a sequence of random actions that reflect a desired distribution (source - Eight to late)
+#Because the walk is random, we have to throw out the initial steps, which is what “burn in” does
+#Then, we perform 2000 iterations, and every 500 are used (i.e., thin)
+#We will perform this process five times (i.e., n start)
+#We will specify 3 topics (k) because I have collected tweets regarding coworkers, work, and supervisors
+
+burnin <- 4000
+iter <- 2000
+thin <- 500
+seed <- list(1,2,3,4,5)
+nstart <- 5
+best <- TRUE #return best results
+k <- 3
+
+
+ldaOut <-topicmodels::LDA(dtm,k=k, method = "Gibbs", control=list(nstart=nstart, seed = seed, best=best, burnin = burnin, iter = iter, thin=thin))
+
+#convert documents to topics
+ldaOut.topics <- as.matrix(topics(ldaOut))
+
+
+#examine top ten terms in each topic
+ldaOut.terms <- as.matrix(terms(ldaOut,10))
+
+#examine probabilities associated with each topic, 1 and 3 seem to be weak, 2 seems to be work related, while 1 seems to be about stress tolerance
+topicProbabilities <- as.data.frame(ldaOut@gamma)
+
+
+#find optimal topics number
+result1 <- FindTopicsNumber(
+  dtm,
+  topics = seq(from = 2, to = 10, by = 1), #2 to 10 topics
+  metrics = c("Griffiths2004", "CaoJuan2009", "Arun2010", "Deveaud2014"),
+  method = "Gibbs",
+  control = list(seed = 12345),
+  verbose = TRUE
+)
+
+#plot results
+FindTopicsNumber_plot(result1)
+
+
+
+ldaOut <-topicmodels::LDA(dtm,k=4, method = "Gibbs", control=list(nstart=nstart, seed = seed, best=best, burnin = burnin, iter = iter, thin=thin))
+
+#examine top terms
+terms(ldaOut, 10)
+
+#the function below gathers information needed for visualization
+
+topicmodels2LDAvis <- function(x, ...){
+  post <- topicmodels::posterior(x)
+  if (ncol(post[["topics"]]) < 3) stop("The model must contain > 2 topics")
+  mat <- x@wordassignments
+  LDAvis::createJSON(
+    phi = post[["terms"]], 
+    theta = post[["topics"]],
+    vocab = colnames(post[["terms"]]),
+    doc.length = slam::row_sums(mat, na.rm = TRUE),
+    term.frequency = slam::col_sums(mat, na.rm = TRUE)
+  )
+}
+
+
+serVis(topicmodels2LDAvis(ldaOut))
+
+
+
+####co occurrence network
+
+fcmat <- fcm(token, context = "window", tri = FALSE)
+feat <- names(topfeatures(fcmat, 30))
+
+fcm_select(fcmat, pattern = feat) %>%
+  textplot_network(min_freq = 0.5)
+
+
+
+
