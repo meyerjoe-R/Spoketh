@@ -183,9 +183,7 @@ RF1 <- ranger(
 
 RF1
 
-#examine rmse
-(default_rmse <- sqrt(RF1$prediction.error))
-
+#examine error
 
 
 #now let's talk about, then examine hyperparameters and other "levers"
