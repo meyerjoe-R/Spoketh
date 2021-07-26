@@ -5,7 +5,7 @@
 #Anna Crawford 
 #Marley Walter 
 
-#Code can be found at: <githublink>
+#Code can be found at: <https://github.com/meyerjoe-R/Spoketh/blob/main/ClimateAnalysisR.R>
 
 
 ###################Set Up Environment###################
